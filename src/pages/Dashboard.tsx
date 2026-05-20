@@ -51,6 +51,14 @@ export const Dashboard: React.FC = () => {
     return Array.from({ length: 180 }, (_, i) => addDays(base, i - 60));
   }, []);
 
+  const dateConTurni = useMemo(() => {
+    const setDate = new Set<string>();
+    turni.forEach(t => {
+      setDate.add(format(new Date(t.data_ora_inizio), 'yyyy-MM-dd'));
+    });
+    return setDate;
+  }, [turni]);
+
   useLayoutEffect(() => {
     if (scrollContainerRef.current) {
       const container = scrollContainerRef.current;
@@ -292,7 +300,7 @@ export const Dashboard: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex flex-col gap-0.5">
           <h2 className="text-xl md:text-2xl font-bold tracking-tight text-slate-950">Orari Settimanali</h2>
-          <p className="text-xs md:text-sm text-slate-500">Gestione dinamica a scatti di 30 minuti.</p>
+          <p className="text-xs md:text-sm text-slate-500">Gestione dinamica e organizzata.</p>
         </div>
         <div className="flex w-full sm:w-auto items-center gap-3 mt-1 sm:mt-0">
           <button onClick={esportaTabellone} disabled={isExporting || turniDelGiorno.length === 0} className="flex flex-1 sm:flex-none justify-center items-center gap-2 rounded-xl border border-slate-200 bg-white py-3.5 sm:px-3.5 sm:py-2.5 text-[15px] sm:text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 transition-all cursor-pointer disabled:opacity-50">
@@ -335,7 +343,8 @@ export const Dashboard: React.FC = () => {
         >
           {giorniScroll.map((giorno) => {
             const isSelected = isSameDay(giorno, dataSelezionata);
-            const isTodayDay = isSameDay(giorno, oraAttuale);
+            const giornoStr = format(giorno, 'yyyy-MM-dd');
+            const haTurni = dateConTurni.has(giornoStr);
             
             return (
               <button
@@ -356,8 +365,8 @@ export const Dashboard: React.FC = () => {
                   {format(giorno, 'd')}
                 </span>
                 
-                {isTodayDay && !isSelected && (
-                  <div className="absolute bottom-1 w-2.5 h-1 rounded-full bg-amber-500"></div>
+                {haTurni && !isSelected && (
+                  <div className="absolute bottom-1.5 w-4 h-1 rounded-full bg-blue-500"></div>
                 )}
               </button>
             );
@@ -502,8 +511,8 @@ export const Dashboard: React.FC = () => {
           <div className="flex items-center gap-3 mb-6">
             <div className="bg-amber-500 text-slate-900 p-2 rounded-xl"><Coffee className="h-8 w-8" /></div>
             <div>
-              <h1 className="text-2xl font-black text-white tracking-tight leading-none">Bar Manager</h1>
-              <p className="text-amber-500 text-xs font-bold uppercase tracking-widest mt-0.5">Turni Ufficiali</p>
+              <h1 className="text-2xl font-black text-white tracking-tight leading-none">Caffè Commercio</h1>
+              <p className="text-amber-500 text-xs font-bold uppercase tracking-widest mt-0.5">Turni Weekend</p>
             </div>
           </div>
           <h2 className="text-4xl font-black text-white capitalize leading-tight">{format(dataSelezionata, "EEEE", { locale: it })}</h2>
@@ -537,7 +546,7 @@ export const Dashboard: React.FC = () => {
             </div>
           )}
         </div>
-        <div className="p-6 text-center text-slate-600 text-[10px] font-bold uppercase tracking-widest border-t border-white/5">Generato automaticamente • Buon Lavoro!</div>
+        <div className="p-6 text-center text-slate-600 text-[10px] font-bold uppercase tracking-widest border-t border-white/5">A presto e buon lavoro!</div>
       </div>
 
     </div>

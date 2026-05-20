@@ -25,7 +25,7 @@ export const Dashboard: React.FC = () => {
   const [dataSelezionata, setDataSelezionata] = useState<Date>(startOfDay(new Date()));
   const [meseVisibile, setMeseVisibile] = useState<Date>(startOfDay(new Date()));
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [erroreValidazione, setErroreValidazione] = useState<string | null>(null);
   const [candidati, setCandidati] = useState<CandidatoConsigliato[]>([]);

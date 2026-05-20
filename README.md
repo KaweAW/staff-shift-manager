@@ -83,3 +83,15 @@ Referential integrity is strictly enforced via foreign keys using `ON DELETE CAS
 1. **Clone the repository:**
    ```bash
    git clone <repository-url>
+
+2. **Install core dependencies:**
+   ```bash
+   npm install
+
+3. **Create a .env file in the project root directory:**
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_public_anon_key
+
+4. **Launch Local Development Server:**
+   ```bash
+   npm run dev

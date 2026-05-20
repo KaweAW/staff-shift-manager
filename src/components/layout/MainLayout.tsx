@@ -76,14 +76,14 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children, currentTab, se
       </header>
 
       {/* BODY MAIN */}
-      <main className="md:pl-64 pb-20 md:pb-0">
+      <main className="md:pl-64 pb-28 md:pb-0">
         <div className="px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto">
           {children}
         </div>
       </main>
 
       {/* BOTTOM MENU MOBILE */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 flex h-16 border-t border-slate-200 bg-white shadow-lg justify-around items-center px-2">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 flex h-20 border-t border-slate-200 bg-white shadow-2xl justify-around items-center px-1 pb-1">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentTab === item.id;
@@ -91,12 +91,12 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children, currentTab, se
             <button
               key={item.id}
               onClick={() => setCurrentTab(item.id as any)}
-              className={`flex flex-col items-center justify-center w-16 h-full gap-1 transition-colors cursor-pointer ${
-                isActive ? 'text-amber-600 font-semibold' : 'text-slate-400'
+              className={`flex flex-col items-center justify-center flex-1 h-full gap-1.5 transition-colors cursor-pointer ${
+                isActive ? 'text-amber-600 font-bold' : 'text-slate-400 font-medium'
               }`}
             >
-              <Icon className="h-5 w-5" />
-              <span className="text-[9px] tracking-wide font-medium">{item.label}</span>
+              <Icon className="h-6.5 w-6.5" />
+              <span className="text-[11px] tracking-wide">{item.label}</span>
             </button>
           );
         })}

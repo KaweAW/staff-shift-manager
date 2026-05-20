@@ -294,15 +294,15 @@ export const Dashboard: React.FC = () => {
           <h2 className="text-xl md:text-2xl font-bold tracking-tight text-slate-950">Orari Settimanali</h2>
           <p className="text-xs md:text-sm text-slate-500">Gestione dinamica a scatti di 30 minuti.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={esportaTabellone} disabled={isExporting || turniDelGiorno.length === 0} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-700 shadow-xs hover:bg-slate-50 transition-all cursor-pointer disabled:opacity-50">
-            <Share2 className="h-4 w-4 text-emerald-600" />
-            <span className="hidden sm:inline">{isExporting ? 'Creazione...' : 'Invia Staff'}</span>
+        <div className="flex w-full sm:w-auto items-center gap-3 mt-1 sm:mt-0">
+          <button onClick={esportaTabellone} disabled={isExporting || turniDelGiorno.length === 0} className="flex flex-1 sm:flex-none justify-center items-center gap-2 rounded-xl border border-slate-200 bg-white py-3.5 sm:px-3.5 sm:py-2.5 text-[15px] sm:text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 transition-all cursor-pointer disabled:opacity-50">
+            <Share2 className="h-5 w-5 sm:h-4 sm:w-4 text-emerald-600 shrink-0" />
+            <span className="truncate">{isExporting ? 'Creazione...' : 'Invia Staff'}</span>
           </button>
           
-          <button onClick={() => { setErroreValidazione(null); setIsModalOpen(true); }} className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-3.5 py-2.5 text-sm font-semibold text-slate-950 shadow-xs hover:bg-amber-400 active:scale-95 transition-all cursor-pointer">
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Nuovo Turno</span>
+          <button onClick={() => { setErroreValidazione(null); setIsModalOpen(true); }} className="flex flex-1 sm:flex-none justify-center items-center gap-2 rounded-xl bg-amber-500 py-3.5 sm:px-3.5 sm:py-2.5 text-[15px] sm:text-sm font-bold text-slate-950 shadow-sm hover:bg-amber-400 active:scale-95 transition-all cursor-pointer">
+            <Plus className="h-5 w-5 sm:h-4 sm:w-4 shrink-0" />
+            <span className="truncate">Nuovo Turno</span>
           </button>
         </div>
       </div>

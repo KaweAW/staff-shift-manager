@@ -3,7 +3,7 @@ import { useCamerieri } from '../hooks/useCamerieri';
 import { useTurni, CandidatoConsigliato } from '../hooks/useTurni';
 import { formattaEuro as toEuro } from '../lib/formatters';
 import { calcolaOreDecimali, formattaOrario } from '../lib/timeUtils';
-import { Plus, Users, Clock, Euro, Trash2, CalendarDays, AlertTriangle, ShieldCheck, Share2, Coffee, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Users, Clock, Euro, Trash2, CalendarDays, AlertTriangle, ShieldCheck, Share2, Coffee, ChevronLeft, ChevronRight, UserX } from 'lucide-react';
 import { startOfWeek, endOfWeek, addDays, format, isSameDay, startOfDay, subWeeks, addWeeks } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { domToPng } from 'modern-screenshot';
@@ -42,6 +42,12 @@ export const Dashboard: React.FC = () => {
     ora_inizio: '18:00',
     ora_fine: '23:30'
   });
+
+  const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
+  const [turnoInEmergenza, setTurnoInEmergenza] = useState<any | null>(null);
+  const [tipoEmergenza, setTipoEmergenza] = useState<'sostituzione' | 'scambio'>('sostituzione');
+  const [sostitutoSelezionato, setSostitutoSelezionato] = useState<string>('');
+  const [turnoDaScambiareSelezionato, setTurnoDaScambiareSelezionato] = useState<string>('');
 
   const oraAttuale = new Date();
   const isOggi = isSameDay(dataSelezionata, oraAttuale);
@@ -138,13 +144,14 @@ export const Dashboard: React.FC = () => {
   }, [aggiornaTabellone]);
 
   useEffect(() => {
-    if (!isModalOpen || camerieri.length === 0) return;
+    const targetTurno = isModalOpen ? nuovoTurno : { ora_inizio: turnoInEmergenza?.data_ora_inizio ? format(new Date(turnoInEmergenza.data_ora_inizio), 'HH:mm') : '18:00', ora_fine: turnoInEmergenza?.data_ora_fine ? format(new Date(turnoInEmergenza.data_ora_fine), 'HH:mm') : '23:30' };
+    if ((!isModalOpen && !isEmergencyModalOpen) || camerieri.length === 0) return;
 
     const calcolaCandidatiLive = async () => {
       setLoadingConsigliere(true);
       const dataStr = format(dataSelezionata, 'yyyy-MM-dd');
-      const inizioDate = new Date(`${dataStr}T${nuovoTurno.ora_inizio}:00`);
-      let fineDate = new Date(`${dataStr}T${nuovoTurno.ora_fine}:00`);
+      const inizioDate = new Date(`${dataStr}T${targetTurno.ora_inizio}:00`);
+      let fineDate = new Date(`${dataStr}T${targetTurno.ora_fine}:00`);
 
       if (fineDate <= inizioDate) {
         fineDate = addDays(fineDate, 1);
@@ -156,7 +163,7 @@ export const Dashboard: React.FC = () => {
     };
 
     calcolaCandidatiLive();
-  }, [isModalOpen, nuovoTurno.ora_inizio, nuovoTurno.ora_fine, dataSelezionata, camerieri, elaboraConsigliere]);
+  }, [isModalOpen, isEmergencyModalOpen, nuovoTurno, turnoInEmergenza, dataSelezionata, camerieri, elaboraConsigliere]);
 
   const turniDelGiorno = turni.filter(t => isSameDay(new Date(t.data_ora_inizio), dataSelezionata));
   
@@ -238,6 +245,61 @@ export const Dashboard: React.FC = () => {
     }
   };
 
+  const handleApplicaEmergenza = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!turnoInEmergenza || isSubmitting) return;
+
+    setIsSubmitting(true);
+
+    try {
+      if (tipoEmergenza === 'sostituzione') {
+        if (!sostitutoSelezionato) return;
+        const idSostitutoNum = parseInt(sostitutoSelezionato);
+        const nuovoCameriereObj = camerieri.find(c => c.id_cameriere === idSostitutoNum);
+        const cameriereVecchioObj = camerieri.find(c => c.id_cameriere === turnoInEmergenza.id_cameriere);
+
+        if (!nuovoCameriereObj) return;
+
+        const infoOrario = `${format(new Date(turnoInEmergenza.data_ora_inizio), 'dd/MM')} dalle ${formattaOrario(turnoInEmergenza.data_ora_inizio)} alle ${formattaOrario(turnoInEmergenza.data_ora_fine)}`;
+        const nomeVecchio = cameriereVecchioObj ? `${cameriereVecchioObj.nome} ${cameriereVecchioObj.cognome}` : 'Dipendente';
+        
+        await eliminaTurno(turnoInEmergenza.id_turno, `Emergenza per ${nomeVecchio}`, infoOrario);
+        const nomeNuovo = `${nuovoCameriereObj.nome} ${nuovoCameriereObj.cognome}`;
+        await aggiungiTurno(idSostitutoNum, turnoInEmergenza.data_ora_inizio, turnoInEmergenza.data_ora_fine, `Sostituzione rapida: ${nomeNuovo}`);
+
+      } else {
+        if (!turnoDaScambiareSelezionato) return;
+        const targetTurno = turniDelGiorno.find(t => t.id_turno === parseInt(turnoDaScambiareSelezionato));
+        if (!targetTurno) return;
+
+        const camA = camerieri.find(c => c.id_cameriere === turnoInEmergenza.id_cameriere);
+        const camB = camerieri.find(c => c.id_cameriere === targetTurno.id_cameriere);
+
+        const nomeA = camA ? `${camA.nome} ${camA.cognome}` : 'Dipendente A';
+        const nomeB = camB ? `${camB.nome} ${camB.cognome}` : 'Dipendente B';
+
+        const infoA = `${format(new Date(turnoInEmergenza.data_ora_inizio), 'dd/MM')} ${formattaOrario(turnoInEmergenza.data_ora_inizio)}-${formattaOrario(turnoInEmergenza.data_ora_fine)}`;
+        const infoB = `${format(new Date(targetTurno.data_ora_inizio), 'dd/MM')} ${formattaOrario(targetTurno.data_ora_inizio)}-${formattaOrario(targetTurno.data_ora_fine)}`;
+
+        await eliminaTurno(turnoInEmergenza.id_turno, `Scambio (Rimozione ${nomeA})`, infoA);
+        await eliminaTurno(targetTurno.id_turno, `Scambio (Rimozione ${nomeB})`, infoB);
+
+        await aggiungiTurno(targetTurno.id_cameriere, turnoInEmergenza.data_ora_inizio, turnoInEmergenza.data_ora_fine, `Scambio: inserito ${nomeB}`);
+        await aggiungiTurno(turnoInEmergenza.id_cameriere, targetTurno.data_ora_inizio, targetTurno.data_ora_fine, `Scambio: inserito ${nomeA}`);
+      }
+
+      setIsEmergencyModalOpen(false);
+      setTurnoInEmergenza(null);
+      setSostitutoSelezionato('');
+      setTurnoDaScambiareSelezionato('');
+      aggiornaTabellone();
+    } catch {
+      alert("Errore nell'esecuzione dell'operazione d'emergenza.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleCancellazioneRapida = async (id_turno: number, id_cameriere: number, inizio: string, fine: string) => {
     const cameriere = camerieri.find(c => c.id_cameriere === id_cameriere);
     const nomeCompleto = cameriere ? `${cameriere.nome} ${cameriere.cognome}` : 'Dipendente';
@@ -286,9 +348,14 @@ export const Dashboard: React.FC = () => {
         </div>
         
         {!isExporting && (
-          <button onClick={() => handleCancellazioneRapida(turno.id_turno, turno.id_cameriere, turno.data_ora_inizio, turno.data_ora_fine)} className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-500 active:scale-95 transition-all cursor-pointer shrink-0">
-            <Trash2 className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button onClick={() => { setTurnoInEmergenza(turno); setSostitutoSelezionato(''); setTurnoDaScambiareSelezionato(''); setTipoEmergenza('sostituzione'); setIsEmergencyModalOpen(true); }} className="rounded-lg p-2 text-slate-400 hover:bg-amber-50 hover:text-amber-600 active:scale-95 transition-all cursor-pointer" title="Gestione Emergenza">
+              <UserX className="h-4 w-4" />
+            </button>
+            <button onClick={() => handleCancellazioneRapida(turno.id_turno, turno.id_cameriere, turno.data_ora_inizio, turno.data_ora_fine)} className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-500 active:scale-95 transition-all cursor-pointer">
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
         )}
       </li>
     );
@@ -448,11 +515,11 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl border border-slate-100 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl border border-slate-100">
             <h3 className="text-lg font-bold text-slate-900 mb-4">Aggiungi Turno</h3>
-            
             <form onSubmit={handleSalvaTurno} className="space-y-4">
+
               {erroreValidazione && (
                 <div className="flex items-start gap-2 rounded-lg bg-red-50 p-2.5 text-xs text-red-700 border border-red-200">
                   <AlertTriangle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
@@ -463,41 +530,143 @@ export const Dashboard: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Ora Inizio</label>
-                  <select value={nuovoTurno.ora_inizio} onChange={(e) => setNuovoTurno({ ...nuovoTurno, ora_inizio: e.target.value })} className="block w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-sm focus:border-amber-500 text-center font-semibold">
+                  <select value={nuovoTurno.ora_inizio} onChange={(e) => setNuovoTurno({ ...nuovoTurno, ora_inizio: e.target.value })} className="block w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-sm font-semibold text-center">
                     {opzioniOrari.map(o => <option key={`ini-${o}`} value={o}>{o}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Ora Fine</label>
-                  <select value={nuovoTurno.ora_fine} onChange={(e) => setNuovoTurno({ ...nuovoTurno, ora_fine: e.target.value })} className="block w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-sm focus:border-amber-500 text-center font-semibold">
+                  <select value={nuovoTurno.ora_fine} onChange={(e) => setNuovoTurno({ ...nuovoTurno, ora_fine: e.target.value })} className="block w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-sm font-semibold text-center">
                     {opzioniOrari.map(o => <option key={`fin-${o}`} value={o}>{o}</option>)}
                   </select>
                 </div>
               </div>
-
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Assegna a</label>
-                <select value={nuovoTurno.id_cameriere} onChange={(e) => setNuovoTurno({ ...nuovoTurno, id_cameriere: e.target.value })} className="block w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-sm focus:border-amber-500" required disabled={loadingConsigliere}>
-                  <option value="">{loadingConsigliere ? 'Calcolo...' : 'Scegli ragazzo...'}</option>
-                  {candidati.map(c => {
-                    let etichetta = `🟢 ${c.cameriere.nome} [${c.orePregresse}h]`;
-                    if (c.stato === 'affaticato') etichetta = `⚠️ ${c.cameriere.nome} [Affaticato]`;
-                    if (c.stato === 'bloccato') etichetta = `❌ ${c.cameriere.nome} [${c.motivoBlocco}]`;
-
-                    return (
-                      <option key={c.cameriere.id_cameriere} value={c.cameriere.id_cameriere} disabled={c.stato === 'bloccato'} className={c.stato === 'bloccato' ? 'text-slate-400 bg-slate-100' : ''}>
-                        {etichetta}
-                      </option>
-                    );
-                  })}
+                <select value={nuovoTurno.id_cameriere} onChange={(e) => setNuovoTurno({ ...nuovoTurno, id_cameriere: e.target.value })} className="block w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-sm focus:border-amber-500" required>
+                  <option value="">Scegli ragazzo...</option>
+                  {candidati.map(c => <option key={c.cameriere.id_cameriere} value={c.cameriere.id_cameriere} disabled={c.stato === 'bloccato'}>
+                    {c.stato === 'bloccato' ? `❌ ${c.cameriere.nome}` : `🟢 ${c.cameriere.nome} [${c.orePregresse}h]`}
+                  </option>)}
                 </select>
-                <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1"><ShieldCheck className="h-3 w-3 text-amber-500" /> Ordinati automaticamente per carichi ed equità.</p>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-semibold text-slate-600">Annulla</button>
+                <button type="submit" disabled={isSubmitting} className="flex-1 rounded-lg bg-amber-500 py-2.5 text-sm font-semibold text-slate-950">{isSubmitting ? 'Salvataggio...' : 'Conferma'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isEmergencyModalOpen && turnoInEmergenza && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-red-950/40 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-2xl border border-red-100 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-2 text-red-600 mb-4">
+              <AlertTriangle className="h-5 w-5 shrink-0" />
+              <h3 className="text-lg font-bold">Risoluzione Emergenza Turno</h3>
+            </div>
+
+            <div className="flex bg-slate-100 p-1 rounded-lg mb-4">
+              <button 
+                type="button" 
+                onClick={() => setTipoEmergenza('sostituzione')} 
+                className={`flex-1 text-center py-2 text-xs font-bold rounded-md transition-all cursor-pointer ${tipoEmergenza === 'sostituzione' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                Sostituzione
+              </button>
+              <button 
+                type="button" 
+                onClick={() => setTipoEmergenza('scambio')} 
+                className={`flex-1 text-center py-2 text-xs font-bold rounded-md transition-all cursor-pointer ${tipoEmergenza === 'scambio' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                Scambio Turno
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+              Stai modificando il turno di <strong>{camerieri.find(c => c.id_cameriere === turnoInEmergenza.id_cameriere)?.nome || 'Dipendente'}</strong> del <strong>{format(new Date(turnoInEmergenza.data_ora_inizio), 'dd MMMM', { locale: it })}</strong> ({formattaOrario(turnoInEmergenza.data_ora_inizio)} - {formattaOrario(turnoInEmergenza.data_ora_fine)}).
+            </p>
+
+            <form onSubmit={handleApplicaEmergenza} className="space-y-4">
+
+              {tipoEmergenza === 'sostituzione' && (
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Sostituto a Casa Disponibile</label>
+                  <select 
+                    value={sostitutoSelezionato} 
+                    onChange={(e) => setSostitutoSelezionato(e.target.value)} 
+                    className="block w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-sm focus:border-red-500 font-semibold"
+                    required
+                    disabled={loadingConsigliere}
+                  >
+                    <option value="">{loadingConsigliere ? 'Calcolo sostituti...' : 'Seleziona sostituto...'}</option>
+                    {candidati
+                      .filter(c => c.cameriere.id_cameriere !== turnoInEmergenza.id_cameriere)
+                      .map(c => {
+                        let etichetta = `🟢 ${c.cameriere.nome} (Disponibile)`;
+                        if (c.stato === 'affaticato') etichetta = `⚠️ ${c.cameriere.nome} (Poco riposo)`;
+                        if (c.stato === 'bloccato') etichetta = `❌ ${c.cameriere.nome} (Impegnato)`;
+
+                        return (
+                          <option key={`sos-${c.cameriere.id_cameriere}`} value={c.cameriere.id_cameriere} disabled={c.stato === 'bloccato'}>
+                            {etichetta}
+                          </option>
+                        );
+                      })
+                    }
+                  </select>
+                </div>
+              )}
+
+              {tipoEmergenza === 'scambio' && (
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Inverti con Turno di:</label>
+                  <select 
+                    value={turnoDaScambiareSelezionato} 
+                    onChange={(e) => setTurnoDaScambiareSelezionato(e.target.value)} 
+                    className="block w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-sm focus:border-red-500 font-semibold"
+                    required
+                  >
+                    <option value="">Seleziona con chi scambiare...</option>
+                    {turniDelGiorno
+                      .filter(t => t.id_turno !== turnoInEmergenza.id_turno) 
+                      .map(t => {
+                        const ragazzo = camerieri.find(c => c.id_cameriere === t.id_cameriere);
+                        const nomeRagazzo = ragazzo ? `${ragazzo.nome} ${ragazzo.cognome.charAt(0)}.` : 'Turno';
+                        return (
+                          <option key={`swap-target-${t.id_turno}`} value={t.id_turno}>
+                            🔄 {nomeRagazzo} ({formattaOrario(t.data_ora_inizio)} - {formattaOrario(t.data_ora_fine)})
+                          </option>
+                        );
+                      })
+                    }
+                  </select>
+                  {turniDelGiorno.length <= 1 && (
+                    <p className="text-[11px] text-red-500 mt-1.5 font-medium">Nessun altro turno registrato oggi con cui effettuare uno scambio.</p>
+                  )}
+                </div>
+              )}
+
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-[11px] text-slate-500 flex items-start gap-2">
+                <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                <span>
+                  {tipoEmergenza === 'sostituzione' 
+                    ? "Rimuove l'attuale dipendente inserendo il sostituto libero mantenendo le stesse ore."
+                    : "Inverte in modo automatico e pulito i due camerieri tra i rispettivi orari di oggi."}
+                </span>
               </div>
 
               <div className="flex gap-2 pt-2">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer">Annulla</button>
-                <button type="submit" disabled={loadingConsigliere || !nuovoTurno.id_cameriere || isSubmitting} className="flex-1 rounded-lg bg-amber-500 py-2.5 text-sm font-semibold text-slate-950 hover:bg-amber-400 disabled:opacity-40 cursor-pointer">
-                  {isSubmitting ? 'Salvataggio...' : 'Conferma'}
+                <button type="button" onClick={() => { setIsEmergencyModalOpen(false); setTurnoInEmergenza(null); }} className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 cursor-pointer">
+                  Annulla
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={isSubmitting || (tipoEmergenza === 'sostituzione' ? !sostitutoSelezionato : !turnoDaScambiareSelezionato)} 
+                  className="flex-1 rounded-lg bg-red-600 py-2.5 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-40 cursor-pointer shadow-xs"
+                >
+                  {isSubmitting ? 'Applicazione...' : 'Conferma e Salva'}
                 </button>
               </div>
             </form>

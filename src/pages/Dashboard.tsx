@@ -39,8 +39,8 @@ export const Dashboard: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [nuovoTurno, setNuovoTurno] = useState({
     id_cameriere: '',
-    ora_inizio: '18:00',
-    ora_fine: '23:30'
+    ora_inizio: '08:00',
+    ora_fine: '12:00'
   });
 
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
